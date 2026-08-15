@@ -27,9 +27,11 @@
 
 ## 量出來的、對自己不利的兩件事
 
-**一、描述在交接時掉了（line-chat-maker 的真實 bug）。**編劇寫「一張畫素極差的柴犬迷因圖」「被 P 上柴犬臉的銀行 App 截圖」，美術指導最後畫出來的是藍色小雪人、黃色小貓咪。因果鏈：系統提示要求帶 `imgDesc` → 但工具 schema 沒宣告這個欄位 → 模型不送 → `hint: m.imgDesc || ''` 永遠是空字串 → 美術指導只好自己編。
+**一、描述在交接時掉了（line-chat-maker 的真實 bug，已修正）。**編劇寫「一張畫素極差的柴犬迷因圖」「被 P 上柴犬臉的銀行 App 截圖」，美術指導最後畫出來的是藍色小雪人、黃色小貓咪。因果鏈：系統提示要求帶 `imgDesc` → 但工具 schema 沒宣告這個欄位 → 模型不送 → `hint: m.imgDesc || ''` 永遠是空字串 → 美術指導只好自己編。
 
 **五個角色每一個都「成功」了，成品卻是壞的。**壞掉的是它們之間的介面，而介面不屬於任何一個角色——每個角色的 log 都是綠的。
+
+2026-08-16 修好了（[line-chat-maker d0493a5](https://github.com/yazelin/line-chat-maker/commit/d0493a5)），修法是在兩個工具的 schema 裡把 `imgDesc`／`dur`／`fname`／`fsize` 宣告出來。用同一套錄製手法實測，非文字訊息帶到描述的比例從 **0/3 變成 7/7**；美術指導畫出來的東西從「藍色小雪人」變成「左手七根手指」「頭頂長出楓樹」「左下角浮現 HELP ME I CANNOT STOP GENERATING」——逐字對應。修好前後兩次都留在頁面上，因為對照本身就是教材。
 
 **二、評審沒有執行自己 prompt 裡寫死的規則。**prompt 寫著「草稿寫成對方的台詞 → real 不得超過 3 且 pass=false」。實測餵它一份踩陷阱的劇本：它在意見裡把問題講得一清二楚，分數卻給了 real=6。**把規則寫進 prompt ≠ 規則會被執行。**
 
@@ -46,6 +48,11 @@ cd .. && node record/build-data.mjs     # 整理成 data/runs.json
 錄製方式是在頁面腳本執行前包住 `window.fetch`，把每一次對代理的請求與回應原樣存下來，**沒有改 line-chat-maker 一行程式碼**。`critic-bench.mjs` 的評審 system prompt 直接從線上的 `ai.js` 抽出來，不手抄——人家改了這裡跟著變。
 
 原始錄製檔留在 `record/run-*.json`（含完整 prompt，較大），網站只用整理過的 `data/runs.json`。
+
+```bash
+python3 -m http.server 8877 && node test/e2e.mjs   # 真瀏覽器端到端
+PAGE=https://yazelin.github.io/ai-crew-lab/ node test/e2e.mjs
+```
 
 ## 授權
 

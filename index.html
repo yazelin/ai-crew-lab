@@ -236,6 +236,20 @@ pre.script.peek{max-height:9rem;overflow:hidden;position:relative;
   <p>這就是這頁一開始講的那件事的反面教材：<b>你不能只設計每個 agent 自己，你要設計它們之間的交接。</b>
   而且沒有人會發現——因為每個角色的 log 都是綠的。</p>
 </div>
+<div class="card">
+  <p><b>2026-08-16 已經修好了。</b>修法只有一行：在兩個工具的 schema 裡把 <code>imgDesc</code>（以及同樣漏掉的 <code>dur</code>、<code>fname</code>、<code>fsize</code>）宣告出來。
+  程式碼本來就不會過濾未知欄位，所以只要宣告了，值就會一路傳到底。</p>
+  <p>修完用同一套錄製手法實測，這是修好前後的對照——<b>同樣的產線、同樣的模型，差別只在 schema 多了一個欄位</b>：</p>
+  <div class="tscroll"><table>
+    <tr><th></th><th>劇本寫的</th><th>美術指導畫出來的</th></tr>
+    <tr><td><b>修好前</b></td><td>畫素極差的柴犬迷因圖<br>被 P 上柴犬臉的銀行 App 截圖</td>
+        <td class="dead">藍色小雪人、黃色小貓咪<br><span class="hint">跟劇情毫無關係</span></td></tr>
+    <tr><td><b>修好後</b></td><td>左手七根手指的 AI 生成圖<br>長椅木板穿過大腿、頭頂長出楓樹<br>左下角浮現「HELP ME I CANNOT STOP GENERATING」</td>
+        <td class="ok">逐字對應<br><span class="hint">連那行字都畫進圖裡了</span></td></tr>
+  </table></div>
+  <p>上面的主題選單裡，「同事之間的日常吐槽」是<b>修好前</b>錄的，「同事吐槽AI生成的圖很崩壞」是<b>修好後</b>錄的。兩個都留著，因為對照本身就是教材。</p>
+  <p class="hint">非文字訊息帶到 <code>imgDesc</code> 的比例：修好前 0/3，修好後 7/7。</p>
+</div>
 
 <h2 id="why">為什麼一定要拆成五個？</h2>
 <p>合成一個「什麼都做」的 AI 不行嗎？把每一刀拆掉看看會怎樣：</p>

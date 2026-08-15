@@ -17,7 +17,8 @@
   function boot() {
     const bar = $('pickRun');
     DATA.runs.forEach((r, i) => {
-      const b = el('button', i === 0 ? 'primary' : '', esc(r.topic.length > 12 ? r.topic.slice(0, 12) + '…' : r.topic));
+      const b = el('button', i === 0 ? 'primary' : '', esc(r.label || r.topic));
+      b.title = r.topic;
       b.addEventListener('click', () => {
         [...bar.children].forEach((c) => c.classList.remove('primary'));
         b.classList.add('primary');
@@ -209,27 +210,34 @@
     const left = el('div');
     left.innerHTML = '<h3>美術指導寫的 prompt</h3><p class="hint">' + esc(r.art.model) + '，' + secs(r.art.ms)
       + '。規定每格 ≤80 字，因為那是要餵給生圖模型的。</p>'
+      + (r.beforeFix
+        ? '<div class="card danger"><p><b>這一次是 bug 修好之前錄的。</b>劇本裡明明寫著柴犬迷因圖、被 P 上柴犬臉的銀行截圖，'
+          + '美術指導卻只能自己編出雪人和貓咪——因為它拿到的描述是空字串。往下看原因。</p></div>'
+        : '<div class="card"><p><b>這一次是修好之後錄的。</b>對照左邊每一格跟劇本的描述，逐字對得上。</p></div>')
       + cells.map((c) => '<div class="card"><b>第 ' + c.cell + ' 格</b><br>' + esc(c.prompt) + '</div>').join('');
     const right = el('div');
+    const gridSrc = r.grid || 'assets/grid.jpg';
+    const cols = cells.length > 4 ? 3 : 2;
     right.innerHTML = '<h3>一次呼叫換回來的格盤</h3>'
-      + '<figure><img src="assets/grid.jpg" alt="2×2 格盤原圖" loading="lazy">'
-      + '<figcaption>生圖模型只被呼叫<b>一次</b>，回來的是這一張。第四格空著，因為這次只有三格要補。</figcaption></figure>'
+      + '<figure><img src="' + gridSrc + '" alt="格盤原圖" loading="lazy">'
+      + '<figcaption>生圖模型只被呼叫<b>一次</b>，回來的是這一張（' + cols + '×' + cols + ' 格，這次用到 '
+      + cells.length + ' 格，其餘空著）。</figcaption></figure>'
       + '<div class="row"><button class="primary" id="btnCut">用程式碼切開它</button></div>'
       + '<div class="grid" id="cutOut"></div>';
     two.appendChild(left); two.appendChild(right);
     box.appendChild(two);
-    $('btnCut').addEventListener('click', () => cut(cells));
+    $('btnCut').addEventListener('click', () => cut(cells, gridSrc, cols));
   }
 
-  function cut(cells) {
+  function cut(cells, src, cols) {
     const out = $('cutOut'); out.innerHTML = '';
     const img = new Image();
     img.onload = () => {
-      const half = img.width / 2;
-      for (let i = 0; i < 4; i++) {
+      const half = img.width / cols;
+      for (let i = 0; i < cols * cols; i++) {
         const c = document.createElement('canvas');
         c.width = c.height = half;
-        c.getContext('2d').drawImage(img, (i % 2) * half, ((i / 2) | 0) * half, half, half, 0, 0, half, half);
+        c.getContext('2d').drawImage(img, (i % cols) * half, ((i / cols) | 0) * half, half, half, 0, 0, half, half);
         const f = el('figure');
         f.appendChild(c);
         const spec = cells.find((x) => x.cell === i + 1);

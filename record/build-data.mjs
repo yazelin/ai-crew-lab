@@ -56,6 +56,17 @@ for (const f of readdirSync('record').filter((f) => /^run-.*\.json$/.test(f)).so
   const raw = JSON.parse(readFileSync('record/' + f, 'utf8'));
   const r = parseRun(raw);
   r.file = f;
+  // 格盤原圖是從生圖服務抓回來另存的(見 README),用檔名對應
+  const GRIDS = { 'run-img.json': 'assets/grid.jpg', 'run-fix2.json': 'assets/grid-fixed.jpg' };
+  if (GRIDS[f]) r.grid = GRIDS[f];
+  if (f === 'run-img.json') r.beforeFix = true;   // 這一次是 imgDesc 修好之前錄的
+  // 按鈕上的短標籤:主題直接截斷會有兩次長得一模一樣,使用者分不出來
+  const LABEL = {
+    'run-1.json': '深夜曖昧', 'run-2.json': '群組修羅場', 'run-812b.json': '情侶吵架和好',
+    'run-a85f.json': '家人的日常（評審壞掉）', 'run-work.json': '職場修羅場',
+    'run-img.json': '有補圖・修好前', 'run-fix.json': '有描述・修好後', 'run-fix2.json': '有補圖・修好後',
+  };
+  r.label = LABEL[f] || r.topic;
   if (r.shot) { // 截圖不塞進 JSON:存成獨立 PNG,再由 shrink-assets.mjs 轉成小 jpg
     mkdirSync('assets', { recursive: true });
     const png = 'assets/' + f.replace(/^run-|\.json$/g, '') + '.png';
