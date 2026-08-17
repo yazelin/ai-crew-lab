@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { statSync, readFileSync } from 'node:fs';
 const dir = mkdtempSync(join(tmpdir(),'crew-'));
 /* port 要每次不同:固定 port 時,上一輪沒收乾淨的 Chrome 還活著,
    fetch 會連到那個舊的瀏覽器,它的 HTTP 快取裡是舊的 app.js —— 
@@ -32,8 +33,18 @@ await send('Page.navigate',{url:process.env.PAGE || 'http://127.0.0.1:8877/'},se
 await new Promise(r=>setTimeout(r,2500));
 const ev=e=>send('Runtime.evaluate',{expression:e,returnByValue:true,awaitPromise:true,timeout:60000},sessionId)
   .then(r=>{if(r.exceptionDetails)throw new Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text);return r.result.value;});
+/* 先確認「瀏覽器拿到的就是磁碟上這一份」。
+   踩過的坑:測試用固定 CDP port,上一輪沒收乾淨的 Chrome 還活著,
+   fetch 會連到那個舊瀏覽器,它的快取裡是舊的 app.js —— 於是測試在驗上一版,
+   還一路顯示全部通過。這道檢查讓那種情況直接掛掉,而不是靜靜地騙人。 */
 let bad=0; const ok=(n,c,x)=>{console.log((c?'  ✓ ':'  ✗ ')+n+(x?'  '+x:''));if(!c)bad++;};
 console.log('\n[AI 劇組實驗室]');
+if (!process.env.PAGE) {   // 打線上版時磁碟上的檔案本來就可能跟線上不同,只在本機比
+  const local = readFileSync(new URL('../app.js', import.meta.url), 'utf8').length;
+  const served = await ev(`(async()=>(await (await fetch('app.js?nocache='+Math.random())).text()).length)()`);
+  ok('瀏覽器拿到的 app.js 就是磁碟上這一份', served === local, served + ' vs ' + local + ' 位元組');
+  if (served !== local) { console.log('\n  → 多半是上一輪的 Chrome 沒死、快取住舊檔。先 pkill -f remote-debugging-port 再跑。'); }
+}
 ok('資料載入、三個範例都在', await ev(`document.querySelectorAll('#pickRun button').length`)===3,
   String(await ev(`document.querySelectorAll('#pickRun button').length`)));
 ok('時間軸畫出來了', await ev(`document.querySelectorAll('#timeline table tr').length`)>3,

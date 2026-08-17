@@ -63,6 +63,8 @@ PAGE=https://yazelin.github.io/ai-crew-lab/ node test/e2e.mjs
 node test/no-leak.mjs                              # 會上線的檔案裡有沒有夾帶內部資訊
 ```
 
+`e2e.mjs` 第一項會比對「瀏覽器拿到的 app.js」跟磁碟上的是不是同一份。踩過的坑：測試用固定 CDP port，上一輪沒收乾淨的 Chrome 還活著，`fetch` 連到的是那個舊瀏覽器、快取裡是舊檔——測試安靜地驗了上一版還顯示全部通過。（另一個看起來像但其實不會騙人的：工作目錄跑錯只會 `MODULE_NOT_FOUND` 直接掛掉。）
+
 `no-leak.mjs` 是因為犯過兩次才加的：這個 repo 的內容是從「錄下來的原始 API 往返」和「別人的原始碼註解」整理出來的，那裡面本來就混著不該對外的東西——一次是把程式碼註解裡的內部出處寫進頁面，一次是 `data/runs.json` 帶著自架服務的內部網域。人記不住，改成每次跑測試都掃一遍。
 
 ## 授權
