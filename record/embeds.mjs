@@ -88,7 +88,7 @@ for (const f of readdirSync('record').filter((x) => /^run-.*\.json$/.test(x)).so
   const i = html.indexOf('<style>');
   const body = html.slice(0, i).trim();
   const style = html.slice(i);
-  if (!sharedStyle) { sharedStyle = style; writeFileSync('data/embeds/_shared.css', style.replace(/^<style>|<\/style>$/g, '').trim()); }
+  if (!sharedStyle) { sharedStyle = style; writeFileSync('data/embeds/shared.css', style.replace(/^<style>|<\/style>$/g, '').trim()); }
   const name = f.replace(/^run-|\.json$/g, '');
   writeFileSync('data/embeds/' + name + '.html', body);
   console.log('  ' + f.padEnd(16) + (body.length / 1024).toFixed(0).padStart(4) + ' KB'

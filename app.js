@@ -89,7 +89,7 @@
     box.appendChild(f);
     const holder = f.querySelector('.embedbox');
     if (!styleLoaded) {
-      const css = await fetch('data/embeds/_shared.css').then((x) => x.text());
+      const css = await fetch('data/embeds/shared.css').then((x) => x.text());
       document.head.appendChild(el('style', '', css));
       styleLoaded = true;
     }
