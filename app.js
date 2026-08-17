@@ -35,9 +35,10 @@
     const tools = r.agent.reduce((a, s) => a + s.calls.length, 0);
     const total = (r.critic[0] ? r.critic[0].writerMs : 0) + r.critic.reduce((a, c) => a + (c.ms || 0), 0)
       + r.agent.reduce((a, s) => a + s.ms, 0) + (r.art ? r.art.ms : 0) + (r.image ? r.image.polls * 5000 : 0);
-    $('runNote').innerHTML = '這一次：主題「<b>' + esc(r.topic) + '</b>」，'
-      + '編劇 ' + r.critic.length + ' 稿、執行 ' + r.agent.length + ' 步、工具呼叫 ' + tools + ' 次'
-      + (r.art ? '、補圖 1 次生圖呼叫' : '') + '，整條產線約 ' + Math.round(total / 1000) + ' 秒。';
+    $('runNote').innerHTML = (r.why ? '<b>這一次要看的：</b>' + esc(r.why) + '<br>' : '')
+      + '<span class="hint">主題「' + esc(r.topic) + '」　編劇 ' + r.critic.length + ' 稿、執行 '
+      + r.agent.length + ' 步、工具呼叫 ' + tools + ' 次'
+      + (r.art ? '、補圖 1 次生圖呼叫' : '') + '，整條產線約 ' + Math.round(total / 1000) + ' 秒。</span>';
     renderTimeline(r);
     renderWriter(r);
     renderAgent(r);
@@ -250,10 +251,8 @@
     const left = el('div');
     left.innerHTML = '<h3>美術指導寫的 prompt</h3><p class="hint">' + esc(r.art.model) + '，' + secs(r.art.ms)
       + '。規定每格 ≤80 字，因為那是要餵給生圖模型的。</p>'
-      + (r.beforeFix
-        ? '<div class="card danger"><p><b>這一次是 bug 修好之前錄的。</b>劇本裡明明寫著柴犬迷因圖、被 P 上柴犬臉的銀行截圖，'
-          + '美術指導卻只能自己編出雪人和貓咪——因為它拿到的描述是空字串。往下看原因。</p></div>'
-        : '<div class="card"><p><b>這一次是修好之後錄的。</b>對照左邊每一格跟劇本的描述，逐字對得上。</p></div>')
+      + '<p class="hint">對照上面那份劇本裡的 ［圖片：…］，每一格都是照著描述寫的；'
+      + '最後一格是人物大頭貼，它跟訊息裡的圖排在同一張盤子上。</p>'
       + cells.map((c) => '<div class="card"><b>第 ' + c.cell + ' 格</b><br>' + esc(c.prompt) + '</div>').join('');
     const right = el('div');
     const gridSrc = r.grid || 'assets/grid.jpg';
@@ -266,7 +265,7 @@
       + '<div class="grid" id="cutOut"></div>';
     two.appendChild(left); two.appendChild(right);
     box.appendChild(two);
-    $('btnCut').addEventListener('click', () => cut(cells, gridSrc, cols));
+    $('btnCut').addEventListener('click', () => cut(cells, gridSrc, cols, (r.art && r.art.slots) || []));
   }
 
   /* 切格與去背直接用 line-chat-maker 自己的 pure.js（vendor/lcm-pure.js），不自己重寫一套。
@@ -274,9 +273,10 @@
      少了這 8%，每一格都會帶著白邊、位置也偏一點——這頁第一版就是這樣壞的。
      chromaKeyData 是貼圖去背：四角取綠的中位數、算色距、羽化邊緣、再壓一次綠溢；
      四角不是綠幕（照片）它就整張保留，所以可以無差別對每一格跑。 */
-  function cut(cells, src, cols) {
+  function cut(cells, src, cols, slots) {
     const out = $('cutOut'); out.innerHTML = '';
     const P = window.LCM_PURE;
+    slots = slots || [];
     const img = new Image();
     img.onload = () => {
       const grid = { cols: cols, rows: cols };
@@ -285,10 +285,14 @@
         const c = document.createElement('canvas');
         c.width = Math.round(r.sw); c.height = Math.round(r.sh);
         const x = c.getContext('2d');
+        if (((slots.find((y) => y.n === i + 1) || {}).type) === 'image') { x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); }
         x.drawImage(img, r.sx, r.sy, r.sw, r.sh, 0, 0, c.width, c.height);
-        const d = x.getImageData(0, 0, c.width, c.height);
-        P.chromaKeyData(d.data, c.width, c.height);
-        x.putImageData(d, 0, 0);
+        const kind = (slots.find((y) => y.n === i + 1) || {}).type;
+        if (kind === 'sticker') {          // 只有貼圖去背
+          const d = x.getImageData(0, 0, c.width, c.height);
+          P.chromaKeyData(d.data, c.width, c.height);
+          x.putImageData(d, 0, 0);
+        }
         const f = el('figure', 'cell');
         f.appendChild(c);
         const spec = cells.find((y) => y.cell === i + 1);

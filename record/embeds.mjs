@@ -30,32 +30,33 @@ function rebuild(raw) {
 /* 把格盤切開貼回訊息。切格與去背一律用 line-chat-maker 自己的 LCM_PURE —— 
    cellRect 每邊內縮 8%(閃開生圖時要求的白色分隔線),chromaKeyData 四角取綠中位數再羽化。
    自己重寫一套的下場:白邊沒切掉、位置偏一點點,而且跟工具本人的結果對不起來。 */
-async function cutCells(ev, gridDataUrl, cols, rows, n) {
+/* 照 ai.js 的 drawSlot 做:image 先鋪白底、sticker 才去背、avatar 兩者都不做。
+   **不能靠顏色決定要不要去背** —— 照片背景剛好是草地時四角一樣是綠的,
+   整片草會被挖掉(這個 repo 第二版就是這樣壞的)。 */
+async function cutCells(ev, gridDataUrl, cols, rows, types) {
   return ev(`(async()=>{
     const im=new Image(); im.src=${JSON.stringify(gridDataUrl)}; await im.decode();
-    const grid={cols:${cols},rows:${rows}};
+    const grid={cols:${cols},rows:${rows}}, types=${JSON.stringify(types)};
     const out=[];
-    for(let i=0;i<${n};i++){
+    for(let i=0;i<types.length;i++){
       const r=LCM_PURE.cellRect(im.width,im.height,grid,i);
-      const c=document.createElement('canvas'); c.width=Math.round(r.sw); c.height=Math.round(r.sh);
+      const t=Math.min(512,Math.max(64,Math.round(r.sw)));
+      const c=document.createElement('canvas'); c.width=c.height=t;
       const x=c.getContext('2d');
-      x.drawImage(im,r.sx,r.sy,r.sw,r.sh,0,0,c.width,c.height);
-      const d=x.getImageData(0,0,c.width,c.height);
-      LCM_PURE.chromaKeyData(d.data,c.width,c.height);   // 不是綠幕的話它自己會整張保留
-      let keyed=false;
-      for(let k=3;k<d.data.length;k+=4) if(d.data[k]<250){keyed=true;break;}
-      x.putImageData(d,0,0);
-      // 縮到 300px 再輸出:data URI 要進 HTML,原尺寸一格就好幾百 KB
-      const s=Math.min(1,300/Math.max(c.width,c.height));
-      const o=document.createElement('canvas'); o.width=Math.round(c.width*s); o.height=Math.round(c.height*s);
+      if(types[i]==='image'){x.fillStyle='#fff';x.fillRect(0,0,t,t);}
+      x.drawImage(im,r.sx,r.sy,r.sw,r.sh,0,0,t,t);
+      if(types[i]==='sticker'){
+        const d=x.getImageData(0,0,t,t);
+        LCM_PURE.chromaKeyData(d.data,t,t);
+        x.putImageData(d,0,0);
+      }
+      const k=Math.min(1,300/t);   // data URI 要進 HTML,原尺寸一格好幾百 KB
+      const o=document.createElement('canvas'); o.width=o.height=Math.round(t*k);
       o.getContext('2d').drawImage(c,0,0,o.width,o.height);
-      // 貼圖要 alpha:用 WebP(有 alpha 又比 PNG 小一個數量級);照片走 JPEG
-      out.push(keyed ? o.toDataURL('image/webp', 0.85) : o.toDataURL('image/jpeg', 0.8));
+      out.push(o.toDataURL('image/webp',0.82));   // 跟 drawSlot 一樣用 WebP,貼圖 alpha 才留得住
     }
     return out;})()`);
 }
-/* 貼回去的順序要跟 ai.js 的 buildSlots 一致:先所有沒圖的 image/sticker 訊息(依訊息順序),
-   再所有沒頭像的人物。大頭貼跟訊息裡的圖是同一張格盤切出來的,順序錯了就會貼到別人身上。 */
 function pasteUrls(state, urls) {
   const msgSlots = state.messages.filter((m) => m.type === 'msg' && (m.kind === 'image' || m.kind === 'sticker') && !m.img);
   const avaSlots = state.people.filter((p) => !p.avatar);
@@ -94,15 +95,17 @@ for (const f of readdirSync('record').filter((x) => /^run-.*\.json$/.test(x)).so
   await send('Page.navigate', { url: PAGE }, sessionId);
   await new Promise((r) => setTimeout(r, 2000));
   // 有補圖的那幾次:把格盤切開貼回去(切格/去背都走頁面裡的 LCM_PURE)
-  const GRID = {
-    'run-fix2.json': ['record/grid-fixed.png', 3, 3, 6],
-    'run-av.json': ['record/grid-av.png', 3, 3, 6],   // 第 6 格是大頭貼
-  };
+  const GRID = { 'run-fix2.json': ['record/grid-fixed.png', 3, 3], 'run-av.json': ['record/grid-av.png', 3, 3] };
   let pasted = 0;
   if (GRID[f]) {
-    const [gf, cols, rows, n] = GRID[f];
+    const [gf, cols, rows] = GRID[f];
+    // 每一格本來是什麼型別:直接讀美術指導那次請求裡的待補圖清單,不用猜
+    const ad = raw.rec.find((c) => /^你是美術指導/.test((() => { try { return JSON.parse(c.req).messages[0].content; } catch (e) { return ''; } })()));
+    const list = ad ? JSON.parse(ad.req).messages[1].content : '';
+    const types = [...list.matchAll(/格(\d+)\((照片|貼圖|頭像)\)/g)]
+      .map((x) => ({ 照片: 'image', 貼圖: 'sticker', 頭像: 'avatar' }[x[2]]));
     const url = 'data:image/png;base64,' + readFileSync(gf).toString('base64');
-    pasted = pasteUrls(script, await cutCells(ev, url, cols, rows, n));
+    pasted = pasteUrls(script, await cutCells(ev, url, cols, rows, types));
   }
   await ev('localStorage.setItem("lcm-state", ' + JSON.stringify(JSON.stringify(script)) + '), 1');
   await send('Page.navigate', { url: PAGE }, sessionId);

@@ -31,7 +31,7 @@ const ev=e=>send('Runtime.evaluate',{expression:e,returnByValue:true,awaitPromis
   .then(r=>{if(r.exceptionDetails)throw new Error(r.exceptionDetails.exception?.description||r.exceptionDetails.text);return r.result.value;});
 let bad=0; const ok=(n,c,x)=>{console.log((c?'  ✓ ':'  ✗ ')+n+(x?'  '+x:''));if(!c)bad++;};
 console.log('\n[AI 劇組實驗室]');
-ok('資料載入、主題按鈕都在', await ev(`document.querySelectorAll('#pickRun button').length`)>=6,
+ok('資料載入、三個範例都在', await ev(`document.querySelectorAll('#pickRun button').length`)===3,
   String(await ev(`document.querySelectorAll('#pickRun button').length`)));
 ok('時間軸畫出來了', await ev(`document.querySelectorAll('#timeline table tr').length`)>3,
   (await ev(`document.querySelectorAll('#timeline table tr').length`))+' 列');
@@ -58,7 +58,7 @@ ok('每一步看得到 required／auto', /required/.test(ag.choices)&&/auto/.tes
 ok('腳本訊息有被畫出來', ag.hasMsgs);
 // 切到有補圖的那一次
 const art = await ev(`(async()=>{
-  const b=[...document.querySelectorAll('#pickRun button')].find(x=>/有補圖・修好後/.test(x.textContent));
+  const b=[...document.querySelectorAll('#pickRun button')].find(x=>/有補圖的完整一輪/.test(x.textContent));
   b.click(); await new Promise(r=>setTimeout(r,300));
   document.querySelector('#btnCut').click(); await new Promise(r=>setTimeout(r,1200));
   return {prompts:document.querySelectorAll('#artBox .card').length,
@@ -69,13 +69,15 @@ const art = await ev(`(async()=>{
 ok('美術指導 prompt 顯示出來', art.prompts>=3, art.prompts+' 格');
 ok('格盤按實際格數切開（6 格→3×3）', art.cells===9, art.cells+' 格');
 // 修好前那一次是 2×2
-const art2 = await ev(`(async()=>{
-  const b=[...document.querySelectorAll('#pickRun button')].find(x=>/有補圖・修好前/.test(x.textContent));
-  b.click(); await new Promise(r=>setTimeout(r,300));
-  document.querySelector('#btnCut').click(); await new Promise(r=>setTimeout(r,1200));
-  return {cells:document.querySelectorAll('#cutOut canvas').length,
-    warn:!!document.querySelector('#artBox .card.danger')}})()`);
-ok('修好前那一次是 2×2，而且有標示', art2.cells===4 && art2.warn, art2.cells+' 格，警告 '+art2.warn);
+/* 大頭貼:待補圖清單的最後一格是人物頭像,切出來要真的貼到人身上 */
+const ava = await ev(`(async()=>{
+  const b=[...document.querySelectorAll('#pickRun button')].find(x=>/有補圖的完整一輪/.test(x.textContent));
+  b.click(); await new Promise(r=>setTimeout(r,1200));
+  const av=document.querySelector('.embedbox .line-chat img.av');
+  return {has:!!av, src:(av&&av.getAttribute('src')||'').slice(0,22),
+    slots:(document.querySelector('#artBox')||{}).textContent.includes('大頭貼')};})()`);
+ok('人物大頭貼有生出來也貼上去了', ava.has && /^data:image/.test(ava.src), ava.src || '(沒有 img.av)');
+
 /* 切格要驗三件事:
    1. 切的是「畫面上那一張」(之前 img.src 寫死成 assets/grid.jpg,顯示 A 切 B)
    2. 每邊內縮 8%(cellRect 的 inset) —— 少了它每格都會帶白邊
@@ -106,7 +108,7 @@ const px = await ev(`(async()=>{
     res({cut:avg(d.data), ref:avg(e2.data), img:src, cells:cs.length,
       w:c.width, expectW:Math.round(im.width/cols*0.84), trans:Math.round(trans/(d.data.length/4)*100)});
   });
-  return {after: await grab('有補圖・修好後',1), before: await grab('有補圖・修好前',0)};
+  return {after: await grab('有補圖的完整一輪',3)};
 })()`);
 for (const [k, v] of Object.entries(px)) {
   const diff = Math.max(...v.cut.map((c, i) => Math.abs(c - v.ref[i])));
@@ -117,6 +119,16 @@ for (const [k, v] of Object.entries(px)) {
 }
 ok('貼圖那一格真的去背了', px.after.trans > 20, px.after.trans + '% 的像素是透明的');
 ok('切出來的圖有內容（非空白）', art.px>1000, art.px+' 個非白像素');
+// 每個範例都要說清楚「這一次要看的是什麼」,不然使用者不知道該點哪一個
+const whys = await ev(`(async()=>{
+  const out=[];
+  for(const b of document.querySelectorAll('#pickRun button')){
+    b.click(); await new Promise(r=>setTimeout(r,350));
+    out.push({label:b.textContent, why:document.querySelector('#runNote').textContent.includes('這一次要看的')});
+  }
+  return out;})()`);
+ok('每個範例都寫了「這一次要看的是什麼」', whys.every((x)=>x.why),
+  whys.map((x)=>x.label).join('／'));
 const of = await ev(`({docW:document.documentElement.clientWidth,scrollW:document.documentElement.scrollWidth})`);
 ok('桌機不會橫向溢位', of.scrollW<=of.docW+2, of.scrollW+' vs '+of.docW);
 // 手機

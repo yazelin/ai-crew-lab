@@ -137,6 +137,7 @@ pre.script.peek{max-height:9rem;overflow:hidden;position:relative;
 figure.shot{max-width:26rem;margin:1.2rem auto;}
 .embedbox .lcm-embed{margin:0 auto!important;}
 figure.cell canvas{background:repeating-conic-gradient(#eee 0 25%,#fff 0 50%) 0 0/16px 16px;}
+#runNote{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:.7rem .9rem;margin:.7rem 0;}
 </style>
 </head>
 <body>
@@ -157,8 +158,9 @@ figure.cell canvas{background:repeating-conic-gradient(#eee 0 25%,#fff 0 50%) 0 
 <p class="hint">同系列還有 <a href="https://yazelin.github.io/invisible-watermark-lab/">隱形浮水印實驗室</a>，拆的是同一個工具的另一半：它怎麼在每張匯出的圖上烙隱形標記。</p>
 
 <h2 id="line">整條產線：五個角色，一次真實跑程</h2>
+<p>下面五次都是真的跑過的。<b>每一次都是為了看到某件事</b>——不是換個主題而已：</p>
 <div class="row" id="pickRun"></div>
-<p class="hint" id="runNote"></p>
+<p id="runNote"></p>
 <div id="timeline"></div>
 
 <div class="card">
@@ -210,56 +212,35 @@ figure.cell canvas{background:repeating-conic-gradient(#eee 0 25%,#fff 0 50%) 0 
 </div>
 
 <h2 id="art">角色四、五　美術指導與生圖</h2>
-<p>劇本裡的 <code>[圖片:海邊夕陽]</code> <code>[貼圖:抱抱的熊]</code> 到這一步才變成真的圖。這裡有兩個角色：
-<b>美術指導</b>（文字模型）為每一格寫繪圖 prompt，<b>生圖模型</b>負責畫。</p>
-<div id="artBox"></div>
-<div class="card">
-  <p><b>整條產線最漂亮的設計在這裡：不管幾張圖，都只呼叫一次生圖。</b>三格圖不是叫三次，是把它們排成一張 <b>2×2 的格盤</b>、一次生出來，再<b>用程式碼切開</b>。</p>
-  <p><b>幾何是程式碼，內容才是 AI。</b>格子在哪、多大、怎麼切，這些是確定的事，寫死就好；只有「這一格該畫什麼」交給模型。
-  這樣做省掉大半呼叫，而且每一格的位置精確到像素——如果讓模型自己排版，它會排歪。</p>
-  <p><b>切的時候每邊要內縮 8%。</b>生圖的 prompt 特地要求「格與格之間用明顯的粗白色分隔線」，
-  那條線是給模型看的邊界，不是內容。所以切格時 <code>cellRect</code> 每邊各退 8% 把它讓開——
-  少了這一步，每一格都會帶著白邊、內容也偏一點。<b>這頁第一版就是這樣壞的，你按下去看到的白邊就是。</b></p>
-  <p><b>貼圖還要去背。</b>純綠背景不是美術選擇，是綠幕：<code>chromaKeyData</code> 從四角取綠的中位數、
-  算每個像素跟它的色距、羽化邊緣、再壓一次邊緣綠溢。四角不是綠幕（照片）它就整張保留，所以可以無差別對每一格跑。</p>
-  <p class="hint">上面這兩段的程式碼，是直接引用 LINE 對話製造機的 <code>pure.js</code>（<code>vendor/lcm-pure.js</code>），
-  不是重寫一份——重寫的那份就是會少掉 8% 內縮那種細節。</p>
-  <p><b>大頭貼也是同一張格盤切出來的。</b>選「連大頭貼一起生」那一次，待補圖清單的最後一格寫的是
-  「『浩子』的大頭貼」——訊息裡的圖和人物頭像排在同一張盤子上，一次畫完。</p>
-</div>
+<p>劇本裡的 <code>［圖片：海邊夕陽］</code> <code>［貼圖：抱抱的熊］</code> 到這一步才變成真的圖。
+這裡有兩個角色：<b>美術指導</b>（文字模型）決定每一格要畫什麼，<b>生圖模型</b>負責畫。</p>
 
-<div class="card danger">
-  <p><b>而這一節藏著這頁最重要的一個發現，是我做這頁時撞到的。</b></p>
-  <p>上面那次的劇本裡，編劇寫了七個描述得非常細的視覺物件：</p>
-  <blockquote class="quote">［圖片：一張畫素極差的迷因圖，畫面是一隻柴犬坐在電腦前，上面用歪七扭八的楷體字寫著「狗醫生上班圖，加油好嗎」］<br>
-  ［圖片：一張嚴肅的銀行 App 登入畫面截圖，但在「請輸入密碼」的輸入框上方，被 P 上了一張客戶傳的那隻柴犬的臉］</blockquote>
-  <p><b>美術指導最後畫出來的是：藍色小雪人、黃色小貓咪、棕白狗狗。</b>跟劇情毫無關係。整個梗死掉了。</p>
-  <p><b>原因是描述在交接時掉了。</b>因果鏈完整可查：</p>
-  <ol>
-    <li>執行 AI 的系統提示白紙黑字寫著「<code>imgDesc</code> 一定要帶（之後 AI 補圖靠它）」</li>
-    <li>但兩個工具的 <b>schema 都沒有宣告 <code>imgDesc</code> 這個欄位</b>——只有 type、kind、side、text、personId、time、read</li>
-    <li>所以模型不會送出它。我錄到的每一則圖片訊息，<code>imgDesc</code> 都是空的</li>
-    <li>補圖那一步是 <code>hint: m.imgDesc || ''</code>——<b>美術指導拿到的線索永遠是空字串</b></li>
-    <li>它只好自己編一個。於是雪人出現在一個講柴犬的故事裡</li>
-  </ol>
-  <p><b>五個角色每一個都「成功」了。</b>編劇寫出好劇本、評審給了 52/60、執行填完腳本沒報錯、美術指導交出三個 prompt、生圖畫得很好看。
-  沒有任何一步失敗，但成品是壞的——<b>因為壞掉的是它們之間的介面，而介面不屬於任何一個角色</b>。</p>
-  <p>這正好反過來印證了這頁一開始講的那句話：<b>不能只設計每個 agent 自己，還要設計它們之間怎麼交接。</b>
-  而且這種錯沒有人會發現——因為每個角色的 log 都是綠的。</p>
-</div>
+<h3>一句描述怎麼一路變成畫面上的圖</h3>
+<div class="tscroll"><table>
+  <tr><th></th><th>誰做的</th><th>做什麼</th></tr>
+  <tr><td>1</td><td><b>編劇</b></td><td>在劇本裡寫 <code>［圖片：一盤擺盤精緻但份量極少的松露野菌燉飯］</code>——描述要具體到畫得出來</td></tr>
+  <tr><td>2</td><td><b>執行</b></td><td>轉成腳本 JSON 時，描述放進該則訊息的 <code>imgDesc</code> 欄位，<code>img</code> 先留空</td></tr>
+  <tr><td>3</td><td><b>程式</b></td><td>掃一遍腳本，把「有 <code>imgDesc</code> 但還沒有圖」的訊息收集成待補圖清單；<b>沒有頭像的人物也一起排進去</b></td></tr>
+  <tr><td>4</td><td><b>程式</b></td><td><code>planGrid</code> 依格數決定盤面：4 格以內 2×2、9 格以內 3×3、再多 3×4</td></tr>
+  <tr><td>5</td><td><b>美術指導</b></td><td>為每一格寫繪圖 prompt，限 80 字，還要維持人物在不同格之間長得一樣</td></tr>
+  <tr><td>6</td><td><b>程式</b></td><td>把每格 prompt 串成一份格盤指令：「一張 N×N 等分網格圖，格與格之間用粗白色分隔線…」</td></tr>
+  <tr><td>7</td><td><b>生圖</b></td><td><b>只呼叫一次</b>，回來一張格盤圖</td></tr>
+  <tr><td>8</td><td><b>程式</b></td><td><code>cellRect</code> 切格（每邊內縮 8% 讓開分隔線）→ 貼圖用 <code>chromaKeyData</code> 去背 → 依清單順序回填</td></tr>
+</table></div>
+<p><b>八個步驟裡，只有兩步是 AI。</b>其餘六步全是程式：收集清單、決定盤面、串指令、切格、去背、回填。
+這條產線的設計邏輯很清楚——<b>能寫死的絕不交給模型</b>。</p>
+
+<div id="artBox"></div>
+
 <div class="card">
-  <p><b>2026-08-16 已經修好了。</b>修法只有一行：在兩個工具的 schema 裡把 <code>imgDesc</code>（以及同樣漏掉的 <code>dur</code>、<code>fname</code>、<code>fsize</code>）宣告出來。
-  程式碼本來就不會過濾未知欄位，所以只要宣告了，值就會一路傳到底。</p>
-  <p>修完用同一套錄製手法實測，這是修好前後的對照——<b>同樣的產線、同樣的模型，差別只在 schema 多了一個欄位</b>：</p>
-  <div class="tscroll"><table>
-    <tr><th></th><th>劇本寫的</th><th>美術指導畫出來的</th></tr>
-    <tr><td><b>修好前</b></td><td>畫素極差的柴犬迷因圖<br>被 P 上柴犬臉的銀行 App 截圖</td>
-        <td class="dead">藍色小雪人、黃色小貓咪<br><span class="hint">跟劇情毫無關係</span></td></tr>
-    <tr><td><b>修好後</b></td><td>左手七根手指的 AI 生成圖<br>長椅木板穿過大腿、頭頂長出楓樹<br>左下角浮現「HELP ME I CANNOT STOP GENERATING」</td>
-        <td class="ok">逐字對應<br><span class="hint">連那行字都畫進圖裡了</span></td></tr>
-  </table></div>
-  <p>上面的主題選單裡，「同事之間的日常吐槽」是<b>修好前</b>錄的，「同事吐槽AI生成的圖很崩壞」是<b>修好後</b>錄的。兩個都留著，因為對照本身就是教材。</p>
-  <p class="hint">非文字訊息帶到 <code>imgDesc</code> 的比例：修好前 0/3，修好後 7/7。</p>
+  <p><b>為什麼要湊成一張格盤，而不是叫六次？</b>省掉五次呼叫是其一，更重要的是<b>一致性</b>：
+  同一次生成裡，那位女生在三張照片裡是同一個人；分六次叫，你會拿到六個不同的人。</p>
+  <p><b>為什麼切格要內縮 8%？</b>格盤指令特地要求「格與格之間用明顯的粗白色分隔線」——那條線是畫給模型看的邊界，不是內容。
+  <code>cellRect</code> 每邊各退 8% 把它讓開。少了這一步，每一格都會帶著白邊。</p>
+  <p><b>為什麼只有貼圖去背？</b>貼圖的 prompt 都指定「純綠背景」，那是綠幕；<code>chromaKeyData</code> 從四角取綠的中位數、
+  算色距、羽化邊緣、再壓一次邊緣綠溢。<b>但這件事不能靠顏色自動判斷</b>——照片的背景剛好是公園草地時，四角也是一片綠，
+  去背會把整片草挖掉。所以要不要去背，是看<b>這一格當初被派的是什麼類型</b>，不是看它長什麼顏色。</p>
+  <p class="hint">切格與去背的程式碼是直接引用 LINE 對話製造機的 <code>pure.js</code>（<code>vendor/lcm-pure.js</code>），不是重寫一份。</p>
 </div>
 
 <h2 id="why">為什麼一定要拆成五個？</h2>
