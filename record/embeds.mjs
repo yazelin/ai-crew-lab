@@ -55,7 +55,7 @@ async function cutCells(ev, gridDataUrl, cols, rows, n) {
     return out;})()`);
 }
 /* 貼回去的順序要跟 ai.js 的 buildSlots 一致:先所有沒圖的 image/sticker 訊息(依訊息順序),
-   再所有沒頭像的人物。大頭貼跟訊息裡的圖是同一張格盤切出來的 —— 那正是這一刀的重點。 */
+   再所有沒頭像的人物。大頭貼跟訊息裡的圖是同一張格盤切出來的,順序錯了就會貼到別人身上。 */
 function pasteUrls(state, urls) {
   const msgSlots = state.messages.filter((m) => m.type === 'msg' && (m.kind === 'image' || m.kind === 'sticker') && !m.img);
   const avaSlots = state.people.filter((p) => !p.avatar);
