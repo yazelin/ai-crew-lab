@@ -28,7 +28,10 @@ function parseRun(raw) {
       const t = msg(c);
       out.art = { model: m, ms: c.ms, text: t ? t.content : '' };
     } else if (/\/images\/jobs$/.test(c.url)) {
-      out.image = { ms: c.ms, status: c.status, job: (j(c.res) || {}).id || '', polls: 0, url: '' };
+      // 盤面大小不要寫死:prompt 第一行就寫著「一張 N×M 等分網格圖」,直接讀出來
+      const g = String((q || {}).prompt || '').match(/一張\s*(\d+)×(\d+)\s*等分網格圖/);
+      out.image = { ms: c.ms, status: c.status, job: (j(c.res) || {}).id || '', polls: 0, url: '',
+        cols: g ? +g[1] : 0, rows: g ? +g[2] : 0 };
     } else if (/\/images\/jobs\//.test(c.url)) {
       if (out.image) { out.image.polls++; const d = j(c.res);
         if (d && d.status === 'succeeded' && d.images && d.images[0]) out.image.url = d.images[0].url; }
@@ -67,10 +70,12 @@ for (const f of readdirSync('record').filter((f) => /^run-.*\.json$/.test(f)).so
     'run-img.json': '有補圖・修好前', 'run-fix.json': '有描述・修好後', 'run-fix2.json': '有補圖・修好後',
   };
   r.label = LABEL[f] || r.topic;
-  /* 成品圖不放進 JSON。錄製當下那張是壞的(擷取座標用錯,上下都被切),
-     現在一律由 record/reshoot.mjs 重拍:把工具呼叫組回腳本、灌回頁面、用頁面座標正確截。 */
-  const jpg = 'assets/' + f.replace(/^run-|\.json$/g, '') + '.jpg';
-  r.shot = existsSync(jpg) ? jpg : null;
+  /* 成品不用截圖,用 line-chat-maker 內建的「嵌入HTML」——那是自包含的真實元件:
+     CSS 內嵌並加了 .lcm-embed 前綴、圖片是 data URI、沒有外部相依,而且可以捲、可以逐則播。
+     純文字那幾次只有 13~19 KB,比長截圖(200~300 KB)還小。見 record/embeds.mjs。 */
+  const name = f.replace(/^run-|\.json$/g, '');
+  r.embed = existsSync('data/embeds/' + name + '.html') ? 'data/embeds/' + name + '.html' : null;
+  delete r.shot;   // 錄製當下那張 base64 截圖不要留在 JSON 裡(它本身也是壞的,見 reshoot.mjs 註解)
   runs.push(r);
   console.log('  ' + f.padEnd(16) + r.topic.padEnd(20)
     + '編劇 ' + (r.critic[0] ? r.critic[0].writerMs : '?') + 'ms'

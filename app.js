@@ -65,19 +65,59 @@
       r.agent.length + ' 步　' + Object.entries(toolNames).map(([n, c]) => '<code>' + n + '</code>×' + c).join('　')]);
     if (r.art) rows.push(['④', '美術指導', r.art.model, r.art.ms, '為每一格寫繪圖 prompt']);
     if (r.image) rows.push(['⑤', '生圖', 'codex-image', r.image.polls * 5000,
-      '<b>1 次</b>生圖呼叫（2×2 格盤），輪詢 ' + r.image.polls + ' 次等它畫完']);
+      '<b>1 次</b>生圖呼叫（' + (r.image.cols ? r.image.cols + '×' + r.image.rows : '') + ' 格盤），輪詢 '
+      + r.image.polls + ' 次等它畫完']);
     t.innerHTML = '<table><tr><th></th><th>角色</th><th>模型</th><th class="num">耗時</th><th>做了什麼</th></tr>'
       + rows.map((x) => '<tr><td><b>' + x[0] + '</b></td><td><b>' + esc(x[1]) + '</b></td>'
         + '<td><code>' + esc(x[2]) + '</code></td><td class="num">' + secs(x[3]) + '</td><td>' + x[4] + '</td></tr>').join('')
       + '</table>';
     box.appendChild(t);
-    if (r.shot) {
-      const f = el('figure', 'shot');
-      f.innerHTML = '<div class="shotbox"><img src="' + r.shot + '" alt="這次跑出來的成品" loading="lazy"></div>'
-        + '<figcaption><b>這一次跑出來的成品</b>（完整長截圖，框內可以往下捲）。上面那幾個角色接力，最後就是為了這張圖。'
-        + (r.art ? '' : '　圖片與貼圖是灰框，因為這一次沒有按「AI 補圖」——那正是第四、五個角色的工作。') + '</figcaption>';
-      box.appendChild(f);
+    if (r.embed) showEmbed(box, r);
+  }
+
+  /* 成品:用 line-chat-maker 自己的「嵌入HTML」，不是截圖。
+     那段 HTML 是自包含的（CSS 內嵌加前綴、圖片是 data URI），所以真的可以捲。
+     它原本帶一小段 inline script（捲到底＋自動播放），innerHTML 不會執行 script，
+     而且教學頁本來就該由使用者自己按播放，所以那段拿掉、播放改由這裡實作。 */
+  let styleLoaded = false;
+  async function showEmbed(box, r) {
+    const f = el('figure', 'shot');
+    f.innerHTML = '<div class="embedbox" hidden></div>'
+      + '<div class="row" style="justify-content:center"><button class="primary" id="btnPlay">▶ 逐則播放</button></div>'
+      + '<figcaption><b>這一次跑出來的成品</b>——不是截圖，是這個工具自己匯出的嵌入元件，可以捲、可以播。'
+      + (r.art ? '' : '　圖片與貼圖是灰框，因為這一次沒有按「AI 補圖」，那正是第四、五個角色的工作。') + '</figcaption>';
+    box.appendChild(f);
+    const holder = f.querySelector('.embedbox');
+    if (!styleLoaded) {
+      const css = await fetch('data/embeds/_shared.css').then((x) => x.text());
+      document.head.appendChild(el('style', '', css));
+      styleLoaded = true;
     }
+    const html = await fetch(r.embed).then((x) => x.text());
+    holder.innerHTML = html.replace(/<script[\s\S]*?<\/script>/g, '');
+    holder.hidden = false;
+    const chat = holder.querySelector('.line-chat');
+    if (chat) chat.scrollTop = chat.scrollHeight;
+    f.querySelector('#btnPlay').addEventListener('click', (e) => play(holder, e.target));
+  }
+
+  async function play(holder, btn) {
+    const chat = holder.querySelector('.line-chat');
+    const nodes = [...holder.querySelectorAll('.line-chat > div')];
+    if (!nodes.length) return;
+    btn.disabled = true; btn.textContent = '播放中…';
+    nodes.forEach((n) => { n.style.visibility = 'hidden'; });
+    if (chat) chat.scrollTop = 0;
+    for (const n of nodes) {
+      await new Promise((s) => setTimeout(s, 420));
+      n.style.visibility = '';
+      n.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], 260);
+      if (chat) { // 捲到剛出現的那一則貼底(不能捲 scrollHeight:hidden 的還佔空間)
+        const nb = n.getBoundingClientRect(), cb = chat.getBoundingClientRect();
+        if (nb.bottom > cb.bottom) chat.scrollTop += nb.bottom - cb.bottom;
+      }
+    }
+    btn.disabled = false; btn.textContent = '▶ 再播一次';
   }
 
   // ── 編劇的實際輸出 ──
@@ -217,7 +257,7 @@
       + cells.map((c) => '<div class="card"><b>第 ' + c.cell + ' 格</b><br>' + esc(c.prompt) + '</div>').join('');
     const right = el('div');
     const gridSrc = r.grid || 'assets/grid.jpg';
-    const cols = cells.length > 4 ? 3 : 2;
+    const cols = (r.image && r.image.cols) || (cells.length > 4 ? 3 : 2); // 格數以生圖請求為準,不用猜
     right.innerHTML = '<h3>一次呼叫換回來的格盤</h3>'
       + '<figure><img src="' + gridSrc + '" alt="格盤原圖" loading="lazy">'
       + '<figcaption>生圖模型只被呼叫<b>一次</b>，回來的是這一張（' + cols + '×' + cols + ' 格，這次用到 '
@@ -249,6 +289,6 @@
       out.insertAdjacentHTML('afterend', out.dataset.done ? '' : '');
       out.dataset.done = '1';
     };
-    img.src = 'assets/grid.jpg';
+    img.src = src;   // 之前寫死 'assets/grid.jpg':顯示的是這一次的格盤,切的卻是另一張,而且用錯格數
   }
 })();

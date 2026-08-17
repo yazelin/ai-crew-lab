@@ -76,6 +76,38 @@ const art2 = await ev(`(async()=>{
   return {cells:document.querySelectorAll('#cutOut canvas').length,
     warn:!!document.querySelector('#artBox .card.danger')}})()`);
 ok('修好前那一次是 2×2，而且有標示', art2.cells===4 && art2.warn, art2.cells+' 格，警告 '+art2.warn);
+/* 切出來的必須真的是「畫面上那張」的對應位置。
+   之前的 bug:img.src 寫死成 assets/grid.jpg,顯示 grid-fixed.jpg 卻切 grid.jpg,
+   還用 3×3 去切 2×2 的內容 —— 畫面看起來有東西,位置全錯。 */
+const px = await ev(`(async()=>{
+  const grab=(label,idx)=>new Promise(async res=>{
+    const b=[...document.querySelectorAll('#pickRun button')].find(x=>x.textContent===label);
+    b.click(); await new Promise(r=>setTimeout(r,400));
+    const src=document.querySelector('#artBox figure img').getAttribute('src');
+    document.querySelector('#btnCut').click(); await new Promise(r=>setTimeout(r,1500));
+    const cs=document.querySelectorAll('#cutOut canvas');
+    const c=cs[idx];
+    const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
+    let r0=0,g0=0,b0=0,n=0;
+    for(let i=0;i<d.length;i+=4){r0+=d[i];g0+=d[i+1];b0+=d[i+2];n++;}
+    // 同一張圖、同一個格子,直接從原圖量一次當對照
+    const im=new Image(); im.src=src;
+    await im.decode();
+    const cols=cs.length===9?3:2, s=im.width/cols;
+    const cv=document.createElement('canvas'); cv.width=cv.height=s;
+    cv.getContext('2d').drawImage(im,(idx%cols)*s,((idx/cols)|0)*s,s,s,0,0,s,s);
+    const e=cv.getContext('2d').getImageData(0,0,s,s).data;
+    let r1=0,g1=0,b1=0,m=0;
+    for(let i=0;i<e.length;i+=4){r1+=e[i];g1+=e[i+1];b1+=e[i+2];m++;}
+    res({cut:[r0/n|0,g0/n|0,b0/n|0], src:[r1/m|0,g1/m|0,b1/m|0], img:src, cells:cs.length});
+  });
+  return {after: await grab('有補圖・修好後',1), before: await grab('有補圖・修好前',0)};
+})()`);
+for (const [k, v] of Object.entries(px)) {
+  const diff = Math.max(...v.cut.map((c, i) => Math.abs(c - v.src[i])));
+  ok('切出來的就是畫面那張圖的對應位置（' + k + '）', diff < 12,
+    v.img + ' 切=' + v.cut.join(',') + ' 原=' + v.src.join(',') + ' 差 ' + diff);
+}
 ok('切出來的圖有內容（非空白）', art.px>1000, art.px+' 個非白像素');
 const of = await ev(`({docW:document.documentElement.clientWidth,scrollW:document.documentElement.scrollWidth})`);
 ok('桌機不會橫向溢位', of.scrollW<=of.docW+2, of.scrollW+' vs '+of.docW);
