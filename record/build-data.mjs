@@ -72,9 +72,9 @@ for (const f of readdirSync('record').filter((f) => /^run-.*\.json$/.test(f)).so
   /* 只留「看得到某件事」的那幾次。其餘只是換主題,或是除錯過程留下的,
      擺上去只會讓人不知道該點哪一個。錄製檔全部留在 record/,要加回來隨時可以。 */
   const KEEP = {
-    'run-812b.json': { label: '一般情況', why: '一切順利的樣子：編劇一稿過關 54/60，執行 10 步填完腳本。先看這個當基準。' },
+    'run-n-plain.json': { label: '一般情況', why: '一切順利的樣子：編劇一稿過關 62/70，執行填完腳本。先看這個當基準。這一次跑在<b>七項評審</b>上，分數行有「合理」那一欄。' },
     'run-a85f.json': { label: '評審壞掉時', why: '評審回的東西 JSON 解析失敗，程式印出「採用目前劇本」就放行——那一次等於沒有評審。用語言模型當裁判，就得先想好它壞掉的時候怎麼辦。' },
-    'run-buy.json': { label: '有補圖的完整一輪', why: '走完五個角色，而且是唯一一次<b>評審真的退件、編劇改寫之後才過</b>（45/60 → 51/60）。劇情是一個人在店裡、一個人在外縣市，每張照片都有非傳不可的理由。' },
+    'run-buy.json': { label: '有補圖的完整一輪', why: '走完五個角色，而且是唯一一次<b>評審真的退件、編劇拿著意見整份重寫</b>（45/60 → 51/60）。劇情是一個人在店裡、一個人在外縣市，每張照片都有非傳不可的理由。' },
   };
   if (!KEEP[f]) { r.__drop = true; } else { r.label = KEEP[f].label; r.why = KEEP[f].why; }
   /* 成品不用截圖,用 line-chat-maker 內建的「嵌入HTML」——那是自包含的真實元件:
@@ -93,6 +93,9 @@ for (const f of readdirSync('record').filter((f) => /^run-.*\.json$/.test(f)).so
     + (r.art ? '　美術指導 ✓' : '') + (r.image ? '　生圖 ' + r.image.polls + ' 次輪詢' : '')
     + (r.shot ? '　有成品圖' : ''));
 }
+// 順序照教學動線(先看正常的,再看兩種例外),不要照檔名
+const ORDER = ['一般情況', '評審壞掉時', '有補圖的完整一輪'];
+runs.sort((a, b) => ORDER.indexOf(a.label) - ORDER.indexOf(b.label));
 const bench = JSON.parse(readFileSync('record/critic-bench.json', 'utf8'));
 writeFileSync('data/runs.json', JSON.stringify({ runs, bench }, null, 1));
 console.log('\n→ data/runs.json  ' + (JSON.stringify({ runs, bench }).length / 1024).toFixed(0) + ' KB');
