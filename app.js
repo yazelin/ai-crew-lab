@@ -72,10 +72,10 @@
       + '</table>';
     box.appendChild(t);
     if (r.shot) {
-      const f = el('figure');
-      f.innerHTML = '<img src="' + r.shot + '" alt="這次跑出來的成品" loading="lazy">'
-        + '<figcaption><b>這一次跑出來的成品。</b>上面五個角色接力，最後就是為了這張圖。</figcaption>';
-      f.style.maxWidth = '360px'; f.style.margin = '1rem auto';
+      const f = el('figure', 'shot');
+      f.innerHTML = '<div class="shotbox"><img src="' + r.shot + '" alt="這次跑出來的成品" loading="lazy"></div>'
+        + '<figcaption><b>這一次跑出來的成品</b>（完整長截圖，框內可以往下捲）。上面那幾個角色接力，最後就是為了這張圖。'
+        + (r.art ? '' : '　圖片與貼圖是灰框，因為這一次沒有按「AI 補圖」——那正是第四、五個角色的工作。') + '</figcaption>';
       box.appendChild(f);
     }
   }

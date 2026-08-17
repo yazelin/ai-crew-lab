@@ -67,12 +67,10 @@ for (const f of readdirSync('record').filter((f) => /^run-.*\.json$/.test(f)).so
     'run-img.json': '有補圖・修好前', 'run-fix.json': '有描述・修好後', 'run-fix2.json': '有補圖・修好後',
   };
   r.label = LABEL[f] || r.topic;
-  if (r.shot) { // 截圖不塞進 JSON:存成獨立 PNG,再由 shrink-assets.mjs 轉成小 jpg
-    mkdirSync('assets', { recursive: true });
-    const png = 'assets/' + f.replace(/^run-|\.json$/g, '') + '.png';
-    if (!existsSync(png.replace('.png', '.jpg'))) writeFileSync(png, Buffer.from(r.shot.split(',')[1], 'base64'));
-    r.shot = png.replace('.png', '.jpg');
-  }
+  /* 成品圖不放進 JSON。錄製當下那張是壞的(擷取座標用錯,上下都被切),
+     現在一律由 record/reshoot.mjs 重拍:把工具呼叫組回腳本、灌回頁面、用頁面座標正確截。 */
+  const jpg = 'assets/' + f.replace(/^run-|\.json$/g, '') + '.jpg';
+  r.shot = existsSync(jpg) ? jpg : null;
   runs.push(r);
   console.log('  ' + f.padEnd(16) + r.topic.padEnd(20)
     + '編劇 ' + (r.critic[0] ? r.critic[0].writerMs : '?') + 'ms'
