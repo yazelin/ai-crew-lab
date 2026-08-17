@@ -35,11 +35,11 @@ function parseRun(raw) {
     } else if (/\/images\/jobs$/.test(c.url)) {
       // 盤面大小不要寫死:prompt 第一行就寫著「一張 N×M 等分網格圖」,直接讀出來
       const g = String((q || {}).prompt || '').match(/一張\s*(\d+)×(\d+)\s*等分網格圖/);
-      out.image = { ms: c.ms, status: c.status, job: (j(c.res) || {}).id || '', polls: 0, url: '',
-        cols: g ? +g[1] : 0, rows: g ? +g[2] : 0 };
+      /* 不要存 job id 與圖片網址:那是自架服務(內部網域)的位址,
+         這份 JSON 會上公開頁面。頁面要的格盤圖在 assets/,不需要原始網址。 */
+      out.image = { ms: c.ms, status: c.status, polls: 0, cols: g ? +g[1] : 0, rows: g ? +g[2] : 0 };
     } else if (/\/images\/jobs\//.test(c.url)) {
-      if (out.image) { out.image.polls++; const d = j(c.res);
-        if (d && d.status === 'succeeded' && d.images && d.images[0]) out.image.url = d.images[0].url; }
+      if (out.image) out.image.polls++;
     } else if (q.tools) {                                   // 執行 agent 的每一步
       const t = msg(c) || {};
       out.agent.push({ ms: c.ms, choice: q.tool_choice ? (typeof q.tool_choice === 'string' ? q.tool_choice : 'required') : 'auto',

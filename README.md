@@ -58,7 +58,10 @@ cd .. && node record/build-data.mjs     # 整理成 data/runs.json
 ```bash
 python3 -m http.server 8877 && node test/e2e.mjs   # 真瀏覽器端到端
 PAGE=https://yazelin.github.io/ai-crew-lab/ node test/e2e.mjs
+node test/no-leak.mjs                              # 會上線的檔案裡有沒有夾帶內部資訊
 ```
+
+`no-leak.mjs` 是因為犯過兩次才加的：這個 repo 的內容是從「錄下來的原始 API 往返」和「別人的原始碼註解」整理出來的，那裡面本來就混著不該對外的東西——一次是把程式碼註解裡的內部出處寫進頁面，一次是 `data/runs.json` 帶著自架服務的內部網域。人記不住，改成每次跑測試都掃一遍。
 
 ## 授權
 
