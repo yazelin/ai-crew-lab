@@ -136,6 +136,7 @@ pre.script.peek{max-height:9rem;overflow:hidden;position:relative;
 .m .t{color:var(--muted);font-size:.72rem;margin-left:.4rem;}
 figure.shot{max-width:26rem;margin:1.2rem auto;}
 .embedbox .lcm-embed{margin:0 auto!important;}
+figure.cell canvas{background:repeating-conic-gradient(#eee 0 25%,#fff 0 50%) 0 0/16px 16px;}
 </style>
 </head>
 <body>
@@ -215,8 +216,16 @@ figure.shot{max-width:26rem;margin:1.2rem auto;}
 <div class="card">
   <p><b>整條產線最漂亮的一刀在這裡：一次只呼叫一次生圖。</b>三格圖不是叫三次，是把它們排成一張 <b>2×2 的格盤</b>、一次生出來，再<b>用程式碼切開</b>。</p>
   <p><b>幾何是程式碼，內容才是 AI。</b>格子在哪、多大、怎麼切，這些是確定的事，寫死就好；只有「這一格該畫什麼」交給模型。
-  這樣做省了三分之二的呼叫，而且每一格的位置精確到像素——如果讓模型自己排版，它會排歪。</p>
-  <p class="hint">上面那張格盤第四格是空的，因為這次只有三格要補。貼圖用純綠背景是為了之後去背；照片就直接是照片。</p>
+  這樣做省掉大半呼叫，而且每一格的位置精確到像素——如果讓模型自己排版，它會排歪。</p>
+  <p><b>切的時候每邊要內縮 8%。</b>生圖的 prompt 特地要求「格與格之間用明顯的粗白色分隔線」，
+  那條線是給模型看的邊界，不是內容。所以切格時 <code>cellRect</code> 每邊各退 8% 把它讓開——
+  少了這一步，每一格都會帶著白邊、內容也偏一點。<b>這頁第一版就是這樣壞的，你按下去看到的白邊就是。</b></p>
+  <p><b>貼圖還要去背。</b>純綠背景不是美術選擇，是綠幕：<code>chromaKeyData</code> 從四角取綠的中位數、
+  算每個像素跟它的色距、羽化邊緣、再壓一次邊緣綠溢。四角不是綠幕（照片）它就整張保留，所以可以無差別對每一格跑。</p>
+  <p class="hint">上面這兩段的程式碼，是直接引用 LINE 對話製造機的 <code>pure.js</code>（<code>vendor/lcm-pure.js</code>），
+  不是重寫一份——重寫的那份就是會少掉 8% 內縮那種細節。</p>
+  <p><b>大頭貼也是同一張格盤切出來的。</b>選「連大頭貼一起生」那一次，待補圖清單的最後一格寫的是
+  「『浩子』的大頭貼」——訊息裡的圖和人物頭像排在同一張盤子上，一次畫完。</p>
 </div>
 
 <div class="card danger">
@@ -306,6 +315,7 @@ figure.shot{max-width:26rem;margin:1.2rem auto;}
   <p>MIT 授權 · 林亞澤 · 這頁純靜態，重播用的是預錄資料，不需要任何金鑰</p>
 </footer>
 </div>
+<script src="vendor/lcm-pure.js"></script>
 <script src="app.js"></script>
 <!-- yz-promo-footer v9 | 三件套+BMC 注意力效果 | https://github.com/yazelin/promo-footer-skill -->
 <script>

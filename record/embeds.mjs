@@ -27,18 +27,41 @@ function rebuild(raw) {
   state.people.forEach((p) => { if (!/^data:image/.test(p.avatar || '')) p.avatar = null; });
   return state;
 }
-function paste(state, dir) {
-  if (!dir || !existsSync(dir)) return 0;
-  const slots = state.messages.filter((m) => m.type === 'msg' && (m.kind === 'image' || m.kind === 'sticker'));
+/* 把格盤切開貼回訊息。切格與去背一律用 line-chat-maker 自己的 LCM_PURE —— 
+   cellRect 每邊內縮 8%(閃開生圖時要求的白色分隔線),chromaKeyData 四角取綠中位數再羽化。
+   自己重寫一套的下場:白邊沒切掉、位置偏一點點,而且跟工具本人的結果對不起來。 */
+async function cutCells(ev, gridDataUrl, cols, rows, n) {
+  return ev(`(async()=>{
+    const im=new Image(); im.src=${JSON.stringify(gridDataUrl)}; await im.decode();
+    const grid={cols:${cols},rows:${rows}};
+    const out=[];
+    for(let i=0;i<${n};i++){
+      const r=LCM_PURE.cellRect(im.width,im.height,grid,i);
+      const c=document.createElement('canvas'); c.width=Math.round(r.sw); c.height=Math.round(r.sh);
+      const x=c.getContext('2d');
+      x.drawImage(im,r.sx,r.sy,r.sw,r.sh,0,0,c.width,c.height);
+      const d=x.getImageData(0,0,c.width,c.height);
+      LCM_PURE.chromaKeyData(d.data,c.width,c.height);   // 不是綠幕的話它自己會整張保留
+      let keyed=false;
+      for(let k=3;k<d.data.length;k+=4) if(d.data[k]<250){keyed=true;break;}
+      x.putImageData(d,0,0);
+      // 縮到 300px 再輸出:data URI 要進 HTML,原尺寸一格就好幾百 KB
+      const s=Math.min(1,300/Math.max(c.width,c.height));
+      const o=document.createElement('canvas'); o.width=Math.round(c.width*s); o.height=Math.round(c.height*s);
+      o.getContext('2d').drawImage(c,0,0,o.width,o.height);
+      // 貼圖要 alpha:用 WebP(有 alpha 又比 PNG 小一個數量級);照片走 JPEG
+      out.push(keyed ? o.toDataURL('image/webp', 0.85) : o.toDataURL('image/jpeg', 0.8));
+    }
+    return out;})()`);
+}
+/* 貼回去的順序要跟 ai.js 的 buildSlots 一致:先所有沒圖的 image/sticker 訊息(依訊息順序),
+   再所有沒頭像的人物。大頭貼跟訊息裡的圖是同一張格盤切出來的 —— 那正是這一刀的重點。 */
+function pasteUrls(state, urls) {
+  const msgSlots = state.messages.filter((m) => m.type === 'msg' && (m.kind === 'image' || m.kind === 'sticker') && !m.img);
+  const avaSlots = state.people.filter((p) => !p.avatar);
   let n = 0;
-  for (let i = 0; i < slots.length; i++) {   // 貼圖要 alpha 走 png、照片走 jpg
-    const png = dir + '/' + (i + 1) + '.png', jpg = dir + '/' + (i + 1) + '.jpg';
-    const f = existsSync(png) ? png : existsSync(jpg) ? jpg : null;
-    if (!f) break;
-    slots[i].img = 'data:image/' + (f.endsWith('.png') ? 'png' : 'jpeg') + ';base64,'
-      + readFileSync(f).toString('base64');
-    n++;
-  }
+  for (const m of msgSlots) { if (n >= urls.length) break; m.img = urls[n++]; }
+  for (const p of avaSlots) { if (n >= urls.length) break; p.avatar = urls[n++]; }
   return n;
 }
 
@@ -68,9 +91,19 @@ for (const f of readdirSync('record').filter((x) => /^run-.*\.json$/.test(x)).so
   const raw = JSON.parse(readFileSync('record/' + f, 'utf8'));
   const script = rebuild(raw);
   if (!script.messages.length) continue;
-  const pasted = paste(script, { 'run-fix2.json': 'record/cells-fix2' }[f]);
   await send('Page.navigate', { url: PAGE }, sessionId);
   await new Promise((r) => setTimeout(r, 2000));
+  // 有補圖的那幾次:把格盤切開貼回去(切格/去背都走頁面裡的 LCM_PURE)
+  const GRID = {
+    'run-fix2.json': ['record/grid-fixed.png', 3, 3, 6],
+    'run-av.json': ['record/grid-av.png', 3, 3, 6],   // 第 6 格是大頭貼
+  };
+  let pasted = 0;
+  if (GRID[f]) {
+    const [gf, cols, rows, n] = GRID[f];
+    const url = 'data:image/png;base64,' + readFileSync(gf).toString('base64');
+    pasted = pasteUrls(script, await cutCells(ev, url, cols, rows, n));
+  }
   await ev('localStorage.setItem("lcm-state", ' + JSON.stringify(JSON.stringify(script)) + '), 1');
   await send('Page.navigate', { url: PAGE }, sessionId);
   await new Promise((r) => setTimeout(r, 2500));

@@ -76,9 +76,11 @@ const art2 = await ev(`(async()=>{
   return {cells:document.querySelectorAll('#cutOut canvas').length,
     warn:!!document.querySelector('#artBox .card.danger')}})()`);
 ok('修好前那一次是 2×2，而且有標示', art2.cells===4 && art2.warn, art2.cells+' 格，警告 '+art2.warn);
-/* 切出來的必須真的是「畫面上那張」的對應位置。
-   之前的 bug:img.src 寫死成 assets/grid.jpg,顯示 grid-fixed.jpg 卻切 grid.jpg,
-   還用 3×3 去切 2×2 的內容 —— 畫面看起來有東西,位置全錯。 */
+/* 切格要驗三件事:
+   1. 切的是「畫面上那一張」(之前 img.src 寫死成 assets/grid.jpg,顯示 A 切 B)
+   2. 每邊內縮 8%(cellRect 的 inset) —— 少了它每格都會帶白邊
+   3. 貼圖有去背(chromaKeyData) —— 少了它貼圖會頂著一塊純綠
+   對照組用同一份 LCM_PURE 算,但來源圖是從畫面上讀的,所以第 1 點還是驗得到。 */
 const px = await ev(`(async()=>{
   const grab=(label,idx)=>new Promise(async res=>{
     const b=[...document.querySelectorAll('#pickRun button')].find(x=>x.textContent===label);
@@ -87,27 +89,33 @@ const px = await ev(`(async()=>{
     document.querySelector('#btnCut').click(); await new Promise(r=>setTimeout(r,1500));
     const cs=document.querySelectorAll('#cutOut canvas');
     const c=cs[idx];
-    const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
-    let r0=0,g0=0,b0=0,n=0;
-    for(let i=0;i<d.length;i+=4){r0+=d[i];g0+=d[i+1];b0+=d[i+2];n++;}
-    // 同一張圖、同一個格子,直接從原圖量一次當對照
-    const im=new Image(); im.src=src;
-    await im.decode();
-    const cols=cs.length===9?3:2, s=im.width/cols;
-    const cv=document.createElement('canvas'); cv.width=cv.height=s;
-    cv.getContext('2d').drawImage(im,(idx%cols)*s,((idx/cols)|0)*s,s,s,0,0,s,s);
-    const e=cv.getContext('2d').getImageData(0,0,s,s).data;
-    let r1=0,g1=0,b1=0,m=0;
-    for(let i=0;i<e.length;i+=4){r1+=e[i];g1+=e[i+1];b1+=e[i+2];m++;}
-    res({cut:[r0/n|0,g0/n|0,b0/n|0], src:[r1/m|0,g1/m|0,b1/m|0], img:src, cells:cs.length});
+    const avg=(d)=>{let r=0,g=0,b=0,n=0;for(let i=0;i<d.length;i+=4){r+=d[i];g+=d[i+1];b+=d[i+2];n++;}return [r/n|0,g/n|0,b/n|0];};
+    const d=c.getContext('2d').getImageData(0,0,c.width,c.height);
+    let trans=0; for(let k=3;k<d.data.length;k+=4) if(d.data[k]<250) trans++;
+    // 對照:用同一份 pure.js 從畫面上那張圖切同一格
+    const im=new Image(); im.src=src; await im.decode();
+    const cols=Math.round(Math.sqrt(cs.length));
+    const r=LCM_PURE.cellRect(im.width,im.height,{cols,rows:cols},idx);
+    const cv=document.createElement('canvas'); cv.width=Math.round(r.sw); cv.height=Math.round(r.sh);
+    const x=cv.getContext('2d');
+    x.drawImage(im,r.sx,r.sy,r.sw,r.sh,0,0,cv.width,cv.height);
+    const e=x.getImageData(0,0,cv.width,cv.height);
+    LCM_PURE.chromaKeyData(e.data,cv.width,cv.height);
+    x.putImageData(e,0,0);
+    const e2=x.getImageData(0,0,cv.width,cv.height);
+    res({cut:avg(d.data), ref:avg(e2.data), img:src, cells:cs.length,
+      w:c.width, expectW:Math.round(im.width/cols*0.84), trans:Math.round(trans/(d.data.length/4)*100)});
   });
   return {after: await grab('有補圖・修好後',1), before: await grab('有補圖・修好前',0)};
 })()`);
 for (const [k, v] of Object.entries(px)) {
-  const diff = Math.max(...v.cut.map((c, i) => Math.abs(c - v.src[i])));
-  ok('切出來的就是畫面那張圖的對應位置（' + k + '）', diff < 12,
-    v.img + ' 切=' + v.cut.join(',') + ' 原=' + v.src.join(',') + ' 差 ' + diff);
+  const diff = Math.max(...v.cut.map((c, i) => Math.abs(c - v.ref[i])));
+  ok('切的是畫面上那一張、位置也對（' + k + '）', diff < 6,
+    v.img + ' 切=' + v.cut.join(',') + ' 對照=' + v.ref.join(',') + ' 差 ' + diff);
+  ok('每邊內縮 8%，白色分隔線沒被切進來（' + k + '）', Math.abs(v.w - v.expectW) <= 2,
+    '格寬 ' + v.w + '，應為 ' + v.expectW);
 }
+ok('貼圖那一格真的去背了', px.after.trans > 20, px.after.trans + '% 的像素是透明的');
 ok('切出來的圖有內容（非空白）', art.px>1000, art.px+' 個非白像素');
 const of = await ev(`({docW:document.documentElement.clientWidth,scrollW:document.documentElement.scrollWidth})`);
 ok('桌機不會橫向溢位', of.scrollW<=of.docW+2, of.scrollW+' vs '+of.docW);

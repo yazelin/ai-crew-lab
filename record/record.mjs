@@ -65,6 +65,12 @@ await ev(`(()=>{const box=document.querySelector('#ai-log');
     .observe(box,{childList:true,subtree:true,characterData:true});return 1})()`);
 
 console.log('主題：' + TOPIC);
+// 從空白草稿開始:不然人物會沿用示範草稿的頭像,補圖就不會生大頭貼
+if (process.env.FRESH === '1') {
+  await ev(`(async()=>{const b=document.querySelector('#ai-new-draft');
+    if(b){b.click(); await new Promise(r=>setTimeout(r,1200));} return 1})()`);
+  console.log('（已開新草稿）');
+}
 await ev(`(()=>{document.querySelector('#ai-prompt').value=${JSON.stringify(TOPIC)};
   document.querySelector('#ai-screenplay-text').value='';return 1})()`);
 

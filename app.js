@@ -269,25 +269,34 @@
     $('btnCut').addEventListener('click', () => cut(cells, gridSrc, cols));
   }
 
+  /* 切格與去背直接用 line-chat-maker 自己的 pure.js（vendor/lcm-pure.js），不自己重寫一套。
+     重點在 cellRect 的 inset=0.08：每邊內縮 8%，閃開生圖時要求的那條粗白色分隔線。
+     少了這 8%，每一格都會帶著白邊、位置也偏一點——這頁第一版就是這樣壞的。
+     chromaKeyData 是貼圖去背：四角取綠的中位數、算色距、羽化邊緣、再壓一次綠溢；
+     四角不是綠幕（照片）它就整張保留，所以可以無差別對每一格跑。 */
   function cut(cells, src, cols) {
     const out = $('cutOut'); out.innerHTML = '';
+    const P = window.LCM_PURE;
     const img = new Image();
     img.onload = () => {
-      const half = img.width / cols;
+      const grid = { cols: cols, rows: cols };
       for (let i = 0; i < cols * cols; i++) {
+        const r = P.cellRect(img.width, img.height, grid, i);
         const c = document.createElement('canvas');
-        c.width = c.height = half;
-        c.getContext('2d').drawImage(img, (i % cols) * half, ((i / cols) | 0) * half, half, half, 0, 0, half, half);
-        const f = el('figure');
+        c.width = Math.round(r.sw); c.height = Math.round(r.sh);
+        const x = c.getContext('2d');
+        x.drawImage(img, r.sx, r.sy, r.sw, r.sh, 0, 0, c.width, c.height);
+        const d = x.getImageData(0, 0, c.width, c.height);
+        P.chromaKeyData(d.data, c.width, c.height);
+        x.putImageData(d, 0, 0);
+        const f = el('figure', 'cell');
         f.appendChild(c);
-        const spec = cells.find((x) => x.cell === i + 1);
+        const spec = cells.find((y) => y.cell === i + 1);
         f.appendChild(el('figcaption', '', spec
-          ? '<b>第 ' + (i + 1) + ' 格</b>　回填到劇本裡那一則訊息'
+          ? '<b>第 ' + (i + 1) + ' 格</b>　回填到腳本裡對應的那一則'
           : '<b>第 ' + (i + 1) + ' 格</b>　沒有用到'));
         out.appendChild(f);
       }
-      out.insertAdjacentHTML('afterend', out.dataset.done ? '' : '');
-      out.dataset.done = '1';
     };
     img.src = src;   // 之前寫死 'assets/grid.jpg':顯示的是這一次的格盤,切的卻是另一張,而且用錯格數
   }
