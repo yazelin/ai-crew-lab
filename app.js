@@ -7,7 +7,8 @@
   const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   const secs = (ms) => (ms / 1000).toFixed(1) + ' 秒';
-  const DIMS = [['arc', '劇情弧'], ['voice', '角色聲音'], ['form', '形式運用'], ['pacing', '節奏'], ['real', '真實感'], ['share', '傳播力']];
+  // 跟 line-chat-maker 的 CRITIC_ITEMS 同一組;logic 是後來加的第七項,舊的跑程沒有這一欄
+  const DIMS = [['arc', '劇情弧'], ['voice', '角色聲音'], ['form', '形式運用'], ['pacing', '節奏'], ['real', '真實感'], ['logic', '情境合理'], ['share', '傳播力']];
 
   let DATA = null, run = null;
 
@@ -52,11 +53,22 @@
     const rows = [];
     const first = r.critic[0] || {};
     rows.push(['①', '編劇', first.writerModel || '—', first.writerMs || 0, '把一句主題寫成完整劇本（' + (r.screenplay || '').length + ' 字）']);
-    r.critic.forEach((c, i) => {
+    /* critic 陣列裡混著「評審判決」和「編劇的改寫稿」——退件之後編劇會再寫一份。
+       兩者要各自成列,不然改寫稿會被畫成一列沒有分數的評審。 */
+    let round = 0;
+    r.critic.forEach((c) => {
+      if (c.rewrite) {
+        rows.push(['①', '編劇（改寫）', c.rewrite.model || '—', c.rewrite.ms || 0,
+          '依評審意見整份重寫（' + c.rewrite.text.length + ' 字）']);
+        return;
+      }
+      round++;
       const v = c.verdict;
-      rows.push(['②', '評審' + (r.critic.length > 1 ? '（第 ' + (i + 1) + ' 輪）' : ''), c.model || '—', c.ms || 0,
-        v ? (v.pass ? '<b class="ok">通過 ' : '<b class="dead">退件 ') + v.total + '/60</b>　'
-          + DIMS.map(([k, n]) => n + ' ' + (v.scores ? v.scores[k] : '?')).join('　')
+      const many = r.critic.filter((x) => !x.rewrite).length > 1;
+      rows.push(['②', '評審' + (many ? '（第 ' + round + ' 輪）' : ''), c.model || '—', c.ms || 0,
+        v ? (v.pass ? '<b class="ok">通過 ' : '<b class="dead">退件 ') + v.total + '</b>　'
+          + DIMS.filter(([k]) => v.scores && typeof v.scores[k] === 'number')
+              .map(([k, n]) => n + ' ' + v.scores[k]).join('　')
           : '<b class="dead">回覆解析失敗</b>，程式採用目前劇本放行']);
     });
     const toolNames = {};

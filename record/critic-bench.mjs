@@ -6,7 +6,7 @@ import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-const CASES = JSON.parse(readFileSync('cases.json', 'utf8'));
+const CASES = JSON.parse(readFileSync(process.env.CASES || 'cases.json', 'utf8'));
 const dir = mkdtempSync(join(tmpdir(), 'lcm-cb-'));
 const port = 9950 + Math.floor(performance.now() % 40);
 const proc = spawn('google-chrome', [`--remote-debugging-port=${port}`, `--user-data-dir=${dir}`,
@@ -36,7 +36,9 @@ const CRITIC = await ev(`(async()=>{
   const j = src.indexOf('\\u0060;', i);
   return src.slice(i + 'const CRITIC_SYSTEM = \\u0060'.length, j);
 })()`);
-console.log('抓到評審 system prompt，' + CRITIC.length + ' 字\n');
+// 想試新版評審:CRITIC_FILE 指到本機檔案,直接覆蓋線上抓來的那份
+const OVERRIDE = process.env.CRITIC_FILE ? readFileSync(process.env.CRITIC_FILE, 'utf8') : null;
+console.log((OVERRIDE ? '用本機的新版評審，' + OVERRIDE.length : '抓到線上評審 system prompt，' + CRITIC.length) + ' 字\n');
 
 const out = [];
 for (const c of CASES) {
@@ -46,7 +48,7 @@ for (const c of CASES) {
     const res = await fetch('https://lcm-ai-proxy.yazelinj303.workers.dev/chat/completions', {
       method:'POST', headers:{'content-type':'application/json'},
       body: JSON.stringify({ model:'openai/gpt-oss-120b', temperature:0.3, messages:[
-        {role:'system',content:${JSON.stringify(CRITIC)}},
+        {role:'system',content:${JSON.stringify(OVERRIDE || CRITIC)}},
         {role:'user',content:${JSON.stringify(c.script)}}]})});
     const d = await res.json();
     const text = ((d.choices||[])[0]||{}).message ? d.choices[0].message.content : JSON.stringify(d).slice(0,400);
@@ -56,10 +58,11 @@ for (const c of CASES) {
   try { verdict = JSON.parse((r.text.match(/\{[\s\S]*\}/) || ['{}'])[0]); } catch (e) {}
   out.push({ ...c, raw: r.text, verdict, ms: r.ms });
   const s = verdict && verdict.scores || {};
-  console.log((verdict ? (verdict.pass ? '通過 ' : '退件 ') + verdict.total + '/60  ' +
-    ['arc','voice','form','pacing','real','share'].map(k=>k+' '+s[k]).join(' ') : '解析失敗') + '  ' + r.ms + 'ms');
+  const keys = verdict && verdict.scores ? Object.keys(verdict.scores) : [];
+  console.log((verdict ? (verdict.pass ? '通過 ' : '退件 ') + verdict.total + '  ' +
+    keys.map(k=>k+' '+s[k]).join(' ') : '解析失敗') + '  ' + r.ms + 'ms');
 }
-writeFileSync('critic-bench.json', JSON.stringify({ critic: CRITIC, cases: out }, null, 1));
+writeFileSync(process.env.OUT || 'critic-bench.json', JSON.stringify({ critic: CRITIC, cases: out }, null, 1));
 console.log('\n→ critic-bench.json');
 sock.close(); proc.kill(); await new Promise((r) => setTimeout(r, 500));
 rmSync(dir, { recursive: true, force: true });

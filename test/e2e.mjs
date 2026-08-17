@@ -8,9 +8,12 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 const dir = mkdtempSync(join(tmpdir(),'crew-'));
-const port = 9770;
+/* port 要每次不同:固定 port 時,上一輪沒收乾淨的 Chrome 還活著,
+   fetch 會連到那個舊的瀏覽器,它的 HTTP 快取裡是舊的 app.js —— 
+   於是測試量到的是上一版的行為,查了很久。 */
+const port = 9700 + (process.pid % 250);
 const proc = spawn('google-chrome',[`--remote-debugging-port=${port}`,`--user-data-dir=${dir}`,
-  '--headless=new','--no-first-run','--window-size=1200,900','about:blank'],{stdio:'ignore'});
+  '--headless=new','--no-first-run','--disable-http-cache','--window-size=1200,900','about:blank'],{stdio:'ignore'});
 let ws; for(let i=0;i<100&&!ws;i++){await new Promise(r=>setTimeout(r,100));
   try{ws=(await(await fetch(`http://127.0.0.1:${port}/json/version`)).json()).webSocketDebuggerUrl;}catch{}}
 const sock=new WebSocket(ws); await new Promise((r,j)=>{sock.onopen=r;sock.onerror=j;});
@@ -127,6 +130,21 @@ const whys = await ev(`(async()=>{
     out.push({label:b.textContent, why:document.querySelector('#runNote').textContent.includes('這一次要看的')});
   }
   return out;})()`);
+const rounds = await ev(`(async()=>{
+  const b=[...document.querySelectorAll('#pickRun button')].find(x=>/完整一輪/.test(x.textContent));
+  b.click(); await new Promise(r=>setTimeout(r,800));
+  const rows=[...document.querySelectorAll('#timeline table tr')].map(t=>t.textContent);
+  const j=await (await fetch('data/runs.json?x='+Date.now())).json();
+  const rr=j.runs.find(x=>/完整一輪/.test(x.label));
+  return {url:location.href, jsonRewrite:rr.critic.map(c=>!!c.rewrite).join(','),
+    liveRewrite:(window.__lastRun&&window.__lastRun.critic||[]).map(c=>!!c.rewrite).join(','),
+    all:rows.map(t=>t.slice(0,14)),
+    critic:rows.filter(t=>t.includes('評審（第')).length,
+    rewrite:rows.filter(t=>t.includes('編劇（改寫）')).length,
+    退件:rows.some(t=>t.includes('退件')), 通過:rows.some(t=>t.includes('通過'))};})()`);
+ok('退件→編劇改寫→再評審，三列都畫出來了',
+  rounds.critic===2 && rounds.rewrite && rounds.退件 && rounds.通過,
+  rounds.all.slice(1,5).join(' → '));
 ok('每個範例都寫了「這一次要看的是什麼」', whys.every((x)=>x.why),
   whys.map((x)=>x.label).join('／'));
 const of = await ev(`({docW:document.documentElement.clientWidth,scrollW:document.documentElement.scrollWidth})`);

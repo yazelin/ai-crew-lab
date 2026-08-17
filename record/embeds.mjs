@@ -95,7 +95,8 @@ for (const f of readdirSync('record').filter((x) => /^run-.*\.json$/.test(x)).so
   await send('Page.navigate', { url: PAGE }, sessionId);
   await new Promise((r) => setTimeout(r, 2000));
   // 有補圖的那幾次:把格盤切開貼回去(切格/去背都走頁面裡的 LCM_PURE)
-  const GRID = { 'run-fix2.json': ['record/grid-fixed.png', 3, 3], 'run-av.json': ['record/grid-av.png', 3, 3] };
+  const GRID = { 'run-fix2.json': ['record/grid-fixed.png', 3, 3], 'run-av.json': ['record/grid-av.png', 3, 3],
+    'run-buy.json': ['record/grid-buy.png', 3, 3] };
   let pasted = 0;
   if (GRID[f]) {
     const [gf, cols, rows] = GRID[f];
