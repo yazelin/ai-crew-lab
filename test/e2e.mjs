@@ -138,7 +138,8 @@ const whys = await ev(`(async()=>{
   const out=[];
   for(const b of document.querySelectorAll('#pickRun button')){
     b.click(); await new Promise(r=>setTimeout(r,350));
-    out.push({label:b.textContent, why:document.querySelector('#runNote').textContent.includes('這一次要看的')});
+    const t=document.querySelector('#runNote').textContent;
+    out.push({label:b.textContent, why:t.includes('這一次要看的'), raw:/&lt;|<\\/?[a-z]+>/i.test(t)});
   }
   return out;})()`);
 const rounds = await ev(`(async()=>{
@@ -158,6 +159,9 @@ ok('退件→編劇改寫→再評審，三列都畫出來了',
   rounds.all.slice(1,5).join(' → '));
 ok('每個範例都寫了「這一次要看的是什麼」', whys.every((x)=>x.why),
   whys.map((x)=>x.label).join('／'));
+// 說明文字是資料,不該夾 HTML —— 夾了會被 escape 成字面標籤印在畫面上
+ok('說明文字沒有把 HTML 標籤印出來', whys.every((x)=>!x.raw),
+  whys.filter((x)=>x.raw).map((x)=>x.label).join('／') || '乾淨');
 const of = await ev(`({docW:document.documentElement.clientWidth,scrollW:document.documentElement.scrollWidth})`);
 ok('桌機不會橫向溢位', of.scrollW<=of.docW+2, of.scrollW+' vs '+of.docW);
 // 手機
