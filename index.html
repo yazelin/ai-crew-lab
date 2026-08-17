@@ -282,7 +282,9 @@ figure.cell canvas{background:repeating-conic-gradient(#eee 0 25%,#fff 0 50%) 0 
   <tr><td>執行端只能透過工具改東西</td>
       <td><b>tool calling / function calling</b>。模型不直接吐結果，而是呼叫你定義好的函式；能不能改到東西由你的程式決定，不是模型說了算。</td></tr>
   <tr><td>強制工具、只回文字就踹回去、改完自審</td>
-      <td>agent 迴圈的常見補丁。這份實作的註解直接寫了參考來源是 zerotype-agent 的迴圈設計。</td></tr>
+      <td>agent 迴圈的常見補丁，不是誰的專利。語言模型很愛回「好的，我將會…」然後什麼也沒做，
+      所以幾乎每個做 agent 的人最後都會長出同一組東西：強制它呼叫工具、只回文字就退回去重來、
+      設一個輪數天花板、動過資料就要求它回頭自審。</td></tr>
   <tr><td>一次生一張格盤再切開</td>
       <td>把確定的部分交給程式、不確定的部分才交給模型。同一個哲學在<a href="https://yazelin.github.io/invisible-watermark-lab/">隱形浮水印實驗室</a>裡也出現過。</td></tr>
 </table></div>
