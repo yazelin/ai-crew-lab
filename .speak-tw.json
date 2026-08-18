@@ -1,0 +1,4 @@
+{
+  "public": ["index.html", "README.md"],
+  "exclude": ["data/", "record/"]
+}
